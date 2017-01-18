@@ -97,7 +97,7 @@ void XRel::GenerateTuples(char *tuples_str_)
 XCon::XCon(const int id_, const int rel_id_, const int arity_, char * scope_str_)
 	:id(id_), rel_id(rel_id_), arity(arity_)
 {
-	int *scope = new int[arity];
+	scope = new int[arity];
 
 	for (int i = 0; i < arity; ++i)
 		scope[i] = atoi(strtok_s(scope_str_, " V", &scope_str_));
@@ -107,6 +107,42 @@ XCon::~XCon()
 {
 	delete[] scope;
 	scope = NULL;
+}
+
+XModel::~XModel()
+{
+	for (int i = 0; i < feature.ds_size; ++i)
+	{
+		delete  doms[i];
+		doms[i] = NULL;
+	}
+	delete[]  doms;
+	doms = NULL;
+
+
+	for (int i = 0; i < feature.vs_size; ++i)
+	{
+		delete  vars[i];
+		vars[i] = NULL;
+	}
+	delete[]  vars;
+	vars = NULL;
+
+	for (int i = 0; i < feature.rs_size; ++i)
+	{
+		delete  rels[i];
+		rels[i] = NULL;
+	}
+	delete[]  rels;
+	rels = NULL;
+
+	for (int i = 0; i < feature.cs_size; ++i)
+	{
+		delete  cons[i];
+		cons[i] = NULL;
+	}
+	delete[]  cons;
+	cons = NULL;
 }
 
 };
