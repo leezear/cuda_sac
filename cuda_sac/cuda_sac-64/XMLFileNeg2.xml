@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<instance>
+  <presentation format="XCSP 2.0" maxConstraintArity="10" name="?" nbSolutions="?">This is a random instance generated from RBGenerator.</presentation>
+  <domains nbDomains="1">
+    <domain name="D0" nbValues="3">1..3</domain>
+  </domains>
+  <variables nbVariables="3">
+    <variable domain="D0" name="V0"/>
+    <variable domain="D0" name="V1"/>
+    <variable domain="D0" name="V2"/>
+  </variables>
+  <relations nbRelations="2">
+    <relation arity="2" name="R0" nbTuples="6" semantics="conflicts">1 2|1 3|2 1|2 3|3 1|3 2|</relation>
+    <relation arity="2" name="R1" nbTuples="6" semantics="conflicts">1 1|2 1|2 2|3 1|3 2|3 3|</relation>
+  </relations>
+  <constraints nbConstraints="2">
+    <constraint arity="2" name="C0" reference="R0" scope="V0 V1"/>
+    <constraint arity="2" name="C1" reference="R1" scope="V1 V2"/>
+  </constraints>
+</instance>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<BenchMark>
+  <BMFiles nbBMFiles = "1">
+    <!--<BMFile id ="0">queens-4_ext.xml</BMFile>-->
+    <BMFile id ="0">queens-4_ext.xml</BMFile>
+    <!--<BMFile id ="0">E:\Projects\benchmarks\composed-25-1-2\composed-25-1-2-0_ext.xml</BMFile>-->
+    <!--<BMFile id ="0">E:\Projects\benchmarks\driver\driverlogw-01c-sat_ext.xml</BMFile>-->
+    <!--<BMFile id ="0">XMLFileNeg2.xml</BMFile>-->
+    <!--<BMFile id ="0">XMLFileNeg.xml</BMFile>-->
+    <!--<BMFile id ="0">XMLFile.xml</BMFile>-->
+    <!--<BMFile id ="0">E:/Projects/benchmarks/ModelRB/frb30-15/frb30-15/frb30-15-1_ext.xml</BMFile>-->
+  </BMFiles>
+</BenchMark>
