@@ -2,7 +2,7 @@
 <BenchMark>
   <BMFiles nbBMFiles = "1">
     <!--<BMFile id ="0">queens-4_ext.xml</BMFile>-->
-    <BMFile id ="0">queens-4_ext.xml</BMFile>
+    <BMFile id ="0">queens-12_ext.xml</BMFile>
     <!--<BMFile id ="0">E:\Projects\benchmarks\composed-25-1-2\composed-25-1-2-0_ext.xml</BMFile>-->
     <!--<BMFile id ="0">E:\Projects\benchmarks\driver\driverlogw-01c-sat_ext.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFileNeg2.xml</BMFile>-->

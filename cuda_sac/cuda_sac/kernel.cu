@@ -21,6 +21,7 @@ int main()
 	builder.GenerateModelFromXml(xmodel);
 	/*cout << xmodel->doms[0]->values[2]<<endl;*/
 	BuildBitModel(xmodel);
+	SACGPU();
 	DelGPUModel();
 	delete xmodel;
 	xmodel = NULL;
