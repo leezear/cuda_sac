@@ -232,6 +232,20 @@ __global__ void showVariables(u32* bitDom, int* MVarPre, int* var_size,
 	}
 }
 
+__global__ void ShowSubConEvt(int3* ConEvt)
+{
+	const int bid = blockIdx.x;
+	const int tid = threadIdx.x;
+	__shared__ int3 s_cevt;
+
+	//if (tid == 0)
+	//{
+	//	if()
+	//	s_cevt = ConEvt[bid];
+	//	printf("(%d, %d, %d)\n", s_cevt.x, s_cevt.y, s_cevt.z);
+	//}
+}
+
 __global__ void showSubVar(u32* bitSubDom, int* var_size, int vs_size) {
 	const int val = blockIdx.x;
 	const int var = blockIdx.y;
@@ -257,6 +271,9 @@ __global__ void GenConPre(int *VarPre, int* BlocksCount, int3* scp, int len) {
 		int pred;
 		//		printf("c_id = %d: (%d = %d, %d = %d)\n", sp.z, sp.x, VarPre[sp.x],
 		//				sp.y, VarPre[sp.y]);
+		if (threadIdx.x == 0)
+			failed = 0;
+		__syncthreads();
 
 		const int2 v_pre = make_int2(VarPre[sp.x], VarPre[sp.y]);
 		if (v_pre.x == 0 && v_pre.y == 0)
@@ -517,50 +534,51 @@ __global__ void CsCheckMainLocal(int* mConEvt, int* mVarPre, int3* scope,
 	}
 }
 
-__global__ void UpDateSubDom(u32* bitDom, u32* bitSubDom, int* SVarPre,
-	int* var_size) {
+__global__ void UpdateSubDom(u32* bitDom, u32* bitSubDom, int* SVarPre,
+	int* var_size, int vs_size) {
 	const int val = blockIdx.x;
 	const int var = blockIdx.y;
 	const int subVar = threadIdx.x;
-	__shared__ u32 s_bitDom;
+	__shared__ int pred;
 
+	//记录子问题标题是否被删除
 	if (subVar == 0)
-		s_bitDom = bitDom[var];
+		pred = bitDom[var] & D_U32_MASK1[val];
 	__syncthreads();
 
 	if (val < var_size[var]) {
-		const int sub_idx = GetBitSubDomIdxDevice(var, val, subVar);
-		const int subpre_idx = GetSVarPreIdxDevice(var, val, subVar);
+		if (subVar < vs_size) {
+			const int sub_idx = GetBitSubDomIdxDevice(var, val, subVar);
+			const int subpre_idx = GetSVarPreIdxDevice(var, val, subVar);
 
-		//子问题被删除
-		if ((s_bitDom & D_U32_MASK1[val]) == 0) {
-			bitSubDom[sub_idx] = 0;
-		}
-		else {
-			if (bitSubDom[sub_idx] != bitDom[subVar]) {
-				//若有变量值发生变化
-				SVarPre[subpre_idx] = 1;
-				bitSubDom[sub_idx] &= bitDom[subVar];
-				//printf("(%d, %d, %d) = %8x, %8x, %d\n", var, val, subVar,
-				//	bitSubDom[sub_idx], bitDom[subVar],
-				//	SVarPre[subpre_idx]);
+			//子问题被删除
+			if (!pred) {
+				bitSubDom[sub_idx] = 0;
 			}
 			else {
-				//若有变量值没发生变化
-				SVarPre[subpre_idx] = 0;
+				if (bitSubDom[sub_idx] != bitDom[subVar]) {
+					//若有变量值发生变化
+					SVarPre[subpre_idx] = 1;
+					bitSubDom[sub_idx] &= bitDom[subVar];
+					//printf("(%d, %d, %d) = %8x, %8x, %d\n", var, val, subVar, bitSubDom[sub_idx], bitDom[subVar], SVarPre[subpre_idx]);
+				}
+				else {
+					//若有变量值没发生变化
+					SVarPre[subpre_idx] = 0;
+				}
 			}
+			//		printf("(%d, %d): %d = %8x, %d\n", var, val, subVar, bitSubDom[sub_idx],
+			//				SVarPre[subpre_idx]);
+			//		printf("(%d, %d, %d): %x, idx = %d\n", var, val, subVar, bitSubDom[idx],
+			//				idx);
+			//		printf("(%d, %d, %d): %x, idx = %d\n", i, j, k, h_bitSubDom[idx], idx);
 		}
-		//		printf("(%d, %d): %d = %8x, %d\n", var, val, subVar, bitSubDom[sub_idx],
-		//				SVarPre[subpre_idx]);
-		//		printf("(%d, %d, %d): %x, idx = %d\n", var, val, subVar, bitSubDom[idx],
-		//				idx);
-		//		printf("(%d, %d, %d): %x, idx = %d\n", i, j, k, h_bitSubDom[idx], idx);
 	}
 }
 
-int CompactConsQueMain(int mcc_blocks, int work_size,
-	thrust::device_vector<int> MCCBCount,
-	thrust::device_vector<int> MCCBOffset);
+//int CompactConsQueMain(int mcc_blocks, int work_size,
+//	thrust::device_vector<int> MCCBCount,
+//	thrust::device_vector<int> MCCBOffset);
 float SACGPU();
 
 float BuidBitModel32bit(XModel *xm) {
@@ -807,110 +825,206 @@ __global__ void GenSubConPre(int* SVarPre, int* SCCBCount, int3* scp, int len) {
 	const int sub_con = threadIdx.x;
 	int3 sp = scp[sub_con];
 	__shared__ int failed;
-	int pred;
+	int pred = 0;
 
-	const int2 v_pre = make_int2(SVarPre[GetSVarPreIdxDevice(var, val, sp.x)],
-		SVarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
-	if (v_pre.x == 0 && v_pre.y == 0)
-		pred = 0;
-	else if (v_pre.x == INT32_MIN || v_pre.y == INT32_MIN)
-		failed = INT32_MIN;
-	else
-		pred = 1;
+	if (sub_con == 0)
+		failed = 0;
+	__syncthreads();
+
+	if (sub_con < len) {
+		const int2 v_pre = make_int2(SVarPre[GetSVarPreIdxDevice(var, val, sp.x)],
+			SVarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
+		if (v_pre.x == 0 && v_pre.y == 0)
+			pred = 0;
+		else if (v_pre.x == INT32_MIN || v_pre.y == INT32_MIN)
+			failed = INT32_MIN;
+		else
+			pred = 1;
+	}
 	__syncthreads();
 
 	int BC = (failed == INT32_MIN) ? INT32_MIN : __syncthreads_count(pred);
 
 	if (threadIdx.x == 0) {
 		SCCBCount[blockIdx.y * gridDim.x + blockIdx.x] = BC;
-		printf("(%d, %d) idx = %d\n", var, val, (blockIdx.y * gridDim.x + blockIdx.x));
+		//printf("(%d, %d) idx = %d, BC = %d\n", var, val, (blockIdx.y * gridDim.x + blockIdx.x), BC);
 	}
 }
 
-__global__ void CompactSubQ(int* VarPre, int3* ConEvt, int* BOffset, int3* scp,
-	int len) {
+//__global__ void CompactSubQ(int* SVarPre, int3* ConEvt, int* BOffset, int3* scp, int len) {
+//	//获取子问题，及
+//	const int val = blockIdx.x;
+//	const int var = blockIdx.y;
+//	const int sub_con = threadIdx.x;
+//	const int blockIdx1D = blockIdx.y * gridDim.x + blockIdx.x;
+//	const int g_idx = blockIdx1D * blockDim.x + threadIdx.x;
+//	extern __shared__ int warpTotals[];
+//	int pred = 0;
+//	int3 sp;
+//
+//	if (sub_con < len) {
+//		sp = scp[sub_con];
+//		//获得判定
+//		const int2 v_pre = make_int2(SVarPre[GetSVarPreIdxDevice(var, val, sp.x)],
+//			SVarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
+//		pred = v_pre.x || v_pre.y;
+//
+//
+//		//	printf("scp[%d, %d, %d], gidx = %d, pred = %d, blockIdx1D = %d\n", var, val,
+//		//			sub_con, g_idx, pred, blockIdx1D);
+//
+//		//warp index
+//		//线程束索引
+//		int w_i = sub_con / WARPSIZE;
+//		//thread index within a warp
+//		//线程束内线程索引
+//		int w_l = g_idx % WARPSIZE;
+//		//thread mask (ERROR IN THE PAPERminus one is required)
+//		//线程掩码
+//		//INT_MAX = 1111 1111 1111 1111 1111 1111 1111 1111
+//		//若线程内id=0，右移32-0-1 = 31位 右侧剩下1位
+//		//若线程内id=5，右移32-5-1 = 26位 右侧剩下6位
+//		//若线程内id=31，右移32-31-1 = 0位 右侧剩下32位
+//		//线程束内threid|  31~~~~~~0
+//		//ballot对应位置|   1......1
+//		int t_m = INT_MAX >> (WARPSIZE - w_l - 1);
+//		//balres = number whose ith bit is one if the ith's thread pred is true masked up to the current index in warp
+//		//线程内局部变量pred = 1，与掩码按位与但过滤掉超过该线程id的记录，只保留变量前面的判定
+//		int b = __ballot(pred) & t_m;
+//		//popc count the number of bit one. simply count the number predicated true BEFORE MY INDEX
+//		//计算只计算当前线程索引对应的前N个的位数之和
+//		//即为线程束内排他扫描
+//		int t_u = __popc(b);
+//
+//		//由每个线程束最后一个线程写入共享内存，对应id为线程束ID，将本线程ID加回，
+//		//将包含求和的最终值写入共享内存，不包含求和的值没有被覆盖
+//		//warpTotals长度为4
+//		if (w_l == WARPSIZE - 1)
+//			//	{
+//			warpTotals[w_i] = t_u + pred;
+//		//		printf("warpTotals[%d] = %d\n", w_i, warpTotals[w_i]);
+//		//	}
+//		__syncthreads();
+//
+//		//线程束id为0，线程束内线程id，若blockDim.x = 128，则w_l < 128/32 = 4
+//		//线程块内第一个线程束的前（4）个线程束工作，w_l < 活动线程束数（4），即每个线程束被一个线程运行
+//		if (w_i == 0 && w_l < blockIdx1D / WARPSIZE) {
+//			int w_i_u = 0;
+//			for (int j = 0; j <= 5; ++j) {
+//				//# of the ones in the j'th digit of the warp offsets
+//				//0->5 6个位置：
+//				//000 001
+//				//000 010
+//				//000 100
+//				//001 000
+//				//010 000
+//				//100 000
+//				int b_j = __ballot(warpTotals[w_l] & pow2i(j));
+//				w_i_u += (__popc(b_j & t_m)) << j;
+//				//printf("indice %i t_m=%i,j=%i,b_j=%i,w_i_u=%i\n",w_l,t_m,j,b_j,w_i_u);
+//			}
+//			warpTotals[w_l] = w_i_u;
+//		}
+//		__syncthreads();
+//		if (pred) {
+//			const int evt_idx = t_u + warpTotals[w_i] + BOffset[blockIdx1D];
+//			//		printf("warpTotals[%d] = %d\n", w_i,  warpTotals[0]);
+//			//		printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, 0, 0, 0);
+//			ConEvt[evt_idx].x = sp.x;
+//			ConEvt[evt_idx].y = sp.y;
+//			ConEvt[evt_idx].z = sp.z;
+//			//printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, ConEvt[evt_idx].x,
+//			//	ConEvt[evt_idx].y, ConEvt[evt_idx].z);
+//		}
+//	}
+//}
+
+// 一维
+__global__ void CompactSubQ(int* SVarPre, int3* ConEvt, int* BOffset, int3* scp, int len) {
 	//获取子问题，及
-	const int val = blockIdx.x;
-	const int var = blockIdx.y;
+	const int bid = blockIdx.x;
+	const int val = bid % D_MDS;
+	const int var = bid / D_MDS;
 	const int sub_con = threadIdx.x;
-	const int blockIdx1D = var * gridDim.x + val;
-	//	const int g_idx = blockIdx1D * blockDim.x + sub_con;
+	const int idx = threadIdx.x + blockIdx.x*blockDim.x;
 	extern __shared__ int warpTotals[];
+	int pred = 0;
+	int3 sp;
 
-	int3 sp = scp[sub_con];
-	//获得判定
-	const int2 v_pre = make_int2(VarPre[GetSVarPreIdxDevice(var, val, sp.x)],
-		VarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
-	int pred = v_pre.x || v_pre.y;
+	if (sub_con < len) {
+		sp = scp[sub_con];
+		//获得判定
+		const int2 v_pre = make_int2(SVarPre[GetSVarPreIdxDevice(var, val, sp.x)],
+			SVarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
+		pred = v_pre.x || v_pre.y;
 
-	//	printf("scp[%d, %d, %d], gidx = %d, pred = %d, blockIdx1D = %d\n", var, val,
-	//			sub_con, g_idx, pred, blockIdx1D);
 
-	//warp index
-	//线程束索引
-	int w_i = sub_con / WARPSIZE;
-	//thread index within a warp
-	//线程束内线程索引
-	int w_l = sub_con % WARPSIZE;
-	//thread mask (ERROR IN THE PAPERminus one is required)
-	//线程掩码
-	//INT_MAX = 1111 1111 1111 1111 1111 1111 1111 1111
-	//若线程内id=0，右移32-0-1 = 31位 右侧剩下1位
-	//若线程内id=5，右移32-5-1 = 26位 右侧剩下6位
-	//若线程内id=31，右移32-31-1 = 0位 右侧剩下32位
-	//线程束内threid|  31~~~~~~0
-	//ballot对应位置|   1......1
-	int t_m = INT_MAX >> (WARPSIZE - w_l - 1);
-	//balres = number whose ith bit is one if the ith's thread pred is true masked up to the current index in warp
-	//线程内局部变量pred = 1，与掩码按位与但过滤掉超过该线程id的记录，只保留变量前面的判定
-	int b = __ballot(pred) & t_m;
-	//popc count the number of bit one. simply count the number predicated true BEFORE MY INDEX
-	//计算只计算当前线程索引对应的前N个的位数之和
-	//即为线程束内排他扫描
-	int t_u = __popc(b);
+		//	printf("scp[%d, %d, %d], gidx = %d, pred = %d, blockIdx1D = %d\n", var, val,
+		//			sub_con, g_idx, pred, blockIdx1D);
 
-	//由每个线程束最后一个线程写入共享内存，对应id为线程束ID，将本线程ID加回，
-	//将包含求和的最终值写入共享内存，不包含求和的值没有被覆盖
-	//warpTotals长度为4
-	if (w_l == WARPSIZE - 1)
-		//	{
-		warpTotals[w_i] = t_u + pred;
-	//		printf("warpTotals[%d] = %d\n", w_i, warpTotals[w_i]);
-	//	}
-	__syncthreads();
+		//warp index
+		//线程束索引
+		int w_i = threadIdx.x / WARPSIZE;
+		//thread index within a warp
+		//线程束内线程索引
+		int w_l = idx % WARPSIZE;
+		//thread mask (ERROR IN THE PAPERminus one is required)
+		//线程掩码
+		//INT_MAX = 1111 1111 1111 1111 1111 1111 1111 1111
+		//若线程内id=0，右移32-0-1 = 31位 右侧剩下1位
+		//若线程内id=5，右移32-5-1 = 26位 右侧剩下6位
+		//若线程内id=31，右移32-31-1 = 0位 右侧剩下32位
+		//线程束内threid|  31~~~~~~0
+		//ballot对应位置|   1......1
+		int t_m = INT_MAX >> (WARPSIZE - w_l - 1);
+		//balres = number whose ith bit is one if the ith's thread pred is true masked up to the current index in warp
+		//线程内局部变量pred = 1，与掩码按位与但过滤掉超过该线程id的记录，只保留变量前面的判定
+		int b = __ballot(pred) & t_m;
+		//popc count the number of bit one. simply count the number predicated true BEFORE MY INDEX
+		//计算只计算当前线程索引对应的前N个的位数之和
+		//即为线程束内排他扫描
+		int t_u = __popc(b);
 
-	//线程束id为0，线程束内线程id，若blockDim.x = 128，则w_l < 128/32 = 4
-	//线程块内第一个线程束的前（4）个线程束工作，w_l < 活动线程束数（4），即每个线程束被一个线程运行
-	if (w_i == 0 && w_l < blockIdx1D / WARPSIZE) {
-		int w_i_u = 0;
-		for (int j = 0; j <= 5; ++j) {
-			//# of the ones in the j'th digit of the warp offsets
-			//0->5 6个位置：
-			//000 001
-			//000 010
-			//000 100
-			//001 000
-			//010 000
-			//100 000
-			int b_j = __ballot(warpTotals[w_l] & pow2i(j));
-			w_i_u += (__popc(b_j & t_m)) << j;
-			//printf("indice %i t_m=%i,j=%i,b_j=%i,w_i_u=%i\n",w_l,t_m,j,b_j,w_i_u);
+		//由每个线程束最后一个线程写入共享内存，对应id为线程束ID，将本线程ID加回，
+		//将包含求和的最终值写入共享内存，不包含求和的值没有被覆盖
+		//warpTotals长度为4
+		if (w_l == WARPSIZE - 1)
+			warpTotals[w_i] = t_u + pred;
+		__syncthreads();
+
+		//线程束id为0，线程束内线程id，若blockDim.x = 128，则w_l < 128/32 = 4
+		//线程块内第一个线程束的前（4）个线程束工作，w_l < 活动线程束数（4），即每个线程束被一个线程运行
+		if (w_i == 0 && w_l < blockDim.x / WARPSIZE) {
+			int w_i_u = 0;
+			for (int j = 0; j <= 5; ++j) {
+				//# of the ones in the j'th digit of the warp offsets
+				//0->5 6个位置：
+				//000 001
+				//000 010
+				//000 100
+				//001 000
+				//010 000
+				//100 000
+				int b_j = __ballot(warpTotals[w_l] & pow2i(j));
+				w_i_u += (__popc(b_j & t_m)) << j;
+				//printf("indice %i t_m=%i,j=%i,b_j=%i,w_i_u=%i\n",w_l,t_m,j,b_j,w_i_u);
+			}
+			warpTotals[w_l] = w_i_u;
 		}
-		warpTotals[w_l] = w_i_u;
-	}
-	__syncthreads();
-
-	if (pred) {
-		const int evt_idx = t_u + warpTotals[w_i] + BOffset[blockIdx1D];
-		//		printf("warpTotals[%d] = %d\n", w_i,  warpTotals[0]);
-		//		printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, 0, 0, 0);
-		ConEvt[evt_idx].x = sp.x;
-		ConEvt[evt_idx].y = sp.y;
-		ConEvt[evt_idx].z = sp.z;
-		//		printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, ConEvt[evt_idx].x,
-		//				ConEvt[evt_idx].y, ConEvt[evt_idx].z);
+		__syncthreads();
+		if (pred) {
+			const int evt_idx = t_u + warpTotals[w_i] + BOffset[blockIdx.x];
+			//		printf("warpTotals[%d] = %d\n", w_i,  warpTotals[0]);
+			//		printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, 0, 0, 0);
+			ConEvt[evt_idx].x = sp.x;
+			ConEvt[evt_idx].y = sp.y;
+			ConEvt[evt_idx].z = sp.z;
+			//printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, ConEvt[evt_idx].x,
+			//	ConEvt[evt_idx].y, ConEvt[evt_idx].z);
+		}
 	}
 }
+
 
 int CompactConsQueMain(int mcc_blocks, int mvc_blocks, int work_size,
 	int work_size_large, thrust::device_vector<int> MCCBCount,
@@ -946,7 +1060,7 @@ int CompactConsQueMain(int mcc_blocks, int mvc_blocks, int work_size,
 }
 
 int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size,
-	int cs_size, thrust::device_vector<int> SCCBCount,
+	int cs_size, int con_thrds, thrust::device_vector<int> SCCBCount,
 	thrust::device_vector<int> SCCBOffset) {
 	int* d_SCCBCount_ptr;
 	int* d_SCCBOffset_ptr;
@@ -954,7 +1068,7 @@ int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size,
 	d_SCCBOffset_ptr = thrust::raw_pointer_cast(SCCBOffset.data());
 	//以约束数量启动
 	//P1
-	GenSubConPre << <scc_blocks, cs_size >> > (d_SVarPre, d_SCCBCount_ptr, d_scope,
+	GenSubConPre << <scc_blocks, con_thrds >> > (d_SVarPre, d_SCCBCount_ptr, d_scope,
 		cs_size);
 	cudaDeviceSynchronize();
 
@@ -966,18 +1080,26 @@ int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size,
 	int total = SCCBOffset[SCCBCount.size() - 1]
 		+ SCCBCount[SCCBCount.size() - 1];
 	std::cout << "total = " << total << std::endl;
+
+	for (size_t i = 0; i < SCCBCount.size(); i++)
+		std::cout << i << ":" << SCCBCount[i] << std::endl;
+
 	if (total < 0)
 		return PROPFAILED;
 
-	////P3
-	//每个约束一个线程进行归约,共享内存大小 = 一个块内线程束的个数,用来装载线程束计算结果
-	CompactSubQ << <scc_blocks, cs_size, sizeof(int) * (cs_size / WARPSIZE) >> > (
+	//////P3
+	////每个约束一个线程进行归约,共享内存大小 = 一个块内线程束的个数,用来装载线程束计算结果
+	//CompactSubQ << <scc_blocks, con_thrds, sizeof(int) * (con_thrds / WARPSIZE) >> > (
+	//	d_SVarPre, d_SConEvt, d_SCCBOffset_ptr, d_scope, cs_size);
+
+	CompactSubQ << < H_VS_SIZE * H_MDS, con_thrds, sizeof(int) * (con_thrds / WARPSIZE) >> > (
 		d_SVarPre, d_SConEvt, d_SCCBOffset_ptr, d_scope, cs_size);
 	cudaDeviceSynchronize();
 
 	//	MVarPreSetZero<<<mvc_blocks, work_size_large>>>(d_MVarPre);
 	//	cudaDeviceSynchronize();
 	return total;
+	return 0;
 }
 void ConstraintsCheckMain(int c_total) {
 	CsCheckMain << <c_total, WORKSIZE >> > (d_MConEvt, d_MVarPre, d_scope, d_bitDom,
@@ -990,8 +1112,9 @@ void ConstraintsCheckMain(int c_total) {
 }
 
 void ConstraintsCheckSub(int c_total) {
-	CsCheckSub << <c_total, WORKSIZE >> > (d_SConEvt, d_SVarPre, d_MVarPre, d_scope,
-		d_bitSubDom, d_bitDom, d_bitSup);
+	//CsCheckSub << <c_total, WORKSIZE >> > (d_SConEvt, d_SVarPre, d_MVarPre, d_scope, d_bitSubDom, d_bitDom, d_bitSup);
+	ShowSubConEvt << <c_total, WORKSIZE >> > (d_SConEvt);
+	cudaDeviceSynchronize();
 }
 
 float SACGPU() {
@@ -1038,21 +1161,28 @@ float SACGPU() {
 	//2. 在子问题上执行AC
 	//2.1. 更新子问题论域
 	dim3 subblock_dim(H_MDS, H_VS_SIZE);
-	UpDateSubDom << <subblock_dim, H_VS_SIZE >> > (d_bitDom, d_bitSubDom, d_SVarPre,
-		d_var_size);
+	const int var_threads = GetTopNum(H_VS_SIZE, WORKSIZE)*WORKSIZE;
+	UpdateSubDom << <subblock_dim, var_threads >> > (d_bitDom, d_bitSubDom, d_SVarPre,
+		d_var_size, H_VS_SIZE);
 
-	//确定子问题运行规格
+	//确定子问题运行规格 = 子问题为线程块，子问题约束为线程
 	//规格
 	const int H_SCCBLOCK = H_VS_SIZE * H_MDS;
 	thrust::device_vector<int> d_SCCBCount(H_SCCBLOCK, 0);
 	thrust::device_vector<int> d_SCCBOffset(H_SCCBLOCK, 0);
 	const int H_SVCBLOCK = H_SCCBLOCK;
+	const int con_threads = GetTopNum(H_CS_SIZE, WORKSIZE)*WORKSIZE;
 	//2.2. 压缩子问题队列
 	int sc_total = CompactConsQueSub(subblock_dim, H_SVCBLOCK, H_VS_SIZE,
-		H_CS_SIZE, d_SCCBCount, d_SCCBOffset);
+		H_CS_SIZE, con_threads, d_SCCBCount, d_SCCBOffset);
 	//2.3. 子问题上约束检查
-	ConstraintsCheckSub(sc_total);
+	//ConstraintsCheckSub(sc_total);
 
+	cudaMemcpy(h_SConEvt, d_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyDeviceToHost);
+	for (size_t i = 0; i < sc_total; i++)
+	{
+		printf("h_SConEvt[%d] = (%2d, %2d, %3d)\n", i, h_SConEvt[i].x, h_SConEvt[i].y, h_SConEvt[i].z);
+	}
 	////	//2.4. 主问题上流压缩取得约束队列
 	////	int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE,
 	////			WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
