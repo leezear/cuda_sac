@@ -140,6 +140,10 @@ static __inline__ __device__ int GetSVarPreIdxDevice(int x, int a, int y) {
 	return (x * D_MDS + a) * D_VS_SIZE + y;
 }
 
+inline int GetSVarPreIdxHost(int x, int a, int y) {
+	return (x * H_MDS + a) * H_VS_SIZE + y;
+}
+
 static __inline__ __device__ void DelValDevice(u32* bitDom, int* mVarPre, int x,
 	int a) {
 	u32 les = bitDom[x] & D_U32_MASK0[a];
@@ -369,6 +373,12 @@ __global__ void MVarPreSetZero(int* mVarPre) {
 		mVarPre[tid] = 0;
 }
 
+__global__ void SVarPreSetZero(int* sVarPre) {
+	const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+	if (tid < D_VS_SIZE*D_VS_SIZE*D_MDS)
+		sVarPre[tid] = 0;
+}
+
 __global__ void CsCheckMain(int* mConEvt, int* mVarPre, int3* scope,
 	u32* bitDom, uint2* bitSup) {
 	const int bid = blockIdx.x;
@@ -422,23 +432,26 @@ __global__ void CsCheckMain(int* mConEvt, int* mVarPre, int3* scope,
 	}
 }
 
-__global__ void CsCheckSub(int3* sConEvt, int* sVarPre, int* mVarPre,
-	int3* scope, u32* bitSubDom, u32* bitDom, uint2* bitSup) {
+__global__ void CsCheckSub(int3* sConEvt, int* sVarPre, int* mVarPre, int3* scope, u32* bitSubDom, u32* bitDom, uint2* bitSup) {
 	const int bid = blockIdx.x;
 	const int tid = threadIdx.x;
 	__shared__ int3 s_scp;
 	__shared__ int3 s_cevt;
 	__shared__ uint2 s_bitSubDom;
+	__shared__ int2 s_bitSubDomIdx;
+	__shared__ int2 s_sVarPreIdx;
 	uint2 l_sum = make_uint2(0, 0);
 	uint2 l_res = make_uint2(0, 0);
-
 	if (tid == 0) {
 		s_cevt = sConEvt[bid];
 		s_scp = scope[s_cevt.z];
-		s_bitSubDom.x = bitSubDom[GetBitSubDomIdxDevice(s_cevt.x, s_cevt.y,
-			s_cevt.x)];
-		s_bitSubDom.y = bitSubDom[GetBitSubDomIdxDevice(s_cevt.x, s_cevt.y,
-			s_cevt.y)];
+		s_bitSubDomIdx.x = GetBitSubDomIdxDevice(s_cevt.x, s_cevt.y, s_scp.x);
+		s_bitSubDomIdx.y = GetBitSubDomIdxDevice(s_cevt.x, s_cevt.y, s_scp.y);
+		s_sVarPreIdx.x = GetSVarPreIdxDevice(s_cevt.x, s_cevt.y, s_scp.x);
+		s_sVarPreIdx.y = GetSVarPreIdxDevice(s_cevt.x, s_cevt.y, s_scp.y);
+		s_bitSubDom.x = bitSubDom[s_bitSubDomIdx.x];
+		s_bitSubDom.y = bitSubDom[s_bitSubDomIdx.y];
+		//printf("c_evt[%d] = (%d, %d, %d) = (%d, %d), bitSubDom.x = %8x, bitSubDom.y = %8x\n", bid, s_cevt.x, s_cevt.y, s_cevt.z, s_scp.x, s_scp.y, s_bitSubDom.x, s_bitSubDom.y);
 	}
 	__syncthreads();
 
@@ -459,25 +472,26 @@ __global__ void CsCheckSub(int3* sConEvt, int* sVarPre, int* mVarPre,
 		//存入全局内存,并记录改变
 		l_res.x &= s_bitSubDom.x;
 		if (s_bitSubDom.x != l_res.x) {
-			atomicAnd(&bitSubDom[s_scp.x], l_res.x);
-			sVarPre[s_scp.x] = 1;
+			atomicAnd(&bitSubDom[s_bitSubDomIdx.x], l_res.x);
+			sVarPre[s_sVarPreIdx.x] = 1;
 
-			if (bitSubDom[s_scp.x] == 0) {
-				sVarPre[s_scp.x] = INT_MIN;
-				printf("(%d, %d), c_id = %d should be delete!\n", s_cevt.x, s_cevt.y, s_cevt.z);
+			if (bitSubDom[s_bitSubDomIdx.x] == 0) {
+				sVarPre[s_sVarPreIdx.x] = INT_MIN;
+				printf("bid = %d, (%d, %d), c_id = %d should be delete!\n", bid, s_cevt.x, s_cevt.y, s_cevt.z);
 				DelValDevice(bitDom, mVarPre, s_cevt.x, s_cevt.y);
 			}
 		}
 	}
 	__syncthreads();
+
 	if (tid == 0) {
 		l_res.y &= s_bitSubDom.y;
 		if (s_bitSubDom.y != l_res.y) {
-			atomicAnd(&bitSubDom[s_scp.y], l_res.y);
-			sVarPre[s_scp.y] = 1;
+			atomicAnd(&bitSubDom[s_bitSubDomIdx.y], l_res.y);
+			sVarPre[s_sVarPreIdx.y] = 1;
 
-			if (bitSubDom[s_scp.y] == 0) {
-				sVarPre[s_scp.y] = INT_MIN;
+			if (bitSubDom[s_bitSubDomIdx.y] == 0) {
+				sVarPre[s_sVarPreIdx.y] = INT_MIN;
 				printf("(%d, %d), c_id = %d should be delete!\n", s_cevt.x, s_cevt.y, s_cevt.z);
 				DelValDevice(bitDom, mVarPre, s_cevt.x, s_cevt.y);
 			}
@@ -756,8 +770,8 @@ float BuidBitModel32bit(XModel *xm) {
 	cudaMalloc(&d_SConPre, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int));
 	cudaMalloc(&d_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3));
 	cudaMalloc(&d_SCon, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3));
-	cudaMalloc(&d_SVar, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3));
-	cudaMalloc(&d_SVarPre, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int));
+	cudaMalloc(&d_SVar, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3));
+	cudaMalloc(&d_SVarPre, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int));
 
 	for (int i = 0; i < H_VS_SIZE; ++i) {
 		for (int j = 0; j < H_MDS; ++j) {
@@ -776,30 +790,22 @@ float BuidBitModel32bit(XModel *xm) {
 
 			for (int k = 0; k < H_VS_SIZE; ++k) {
 				//子问题(i, j) k为变量id
-				const int idx = (i * H_MDS + j) * H_VS_SIZE + k;
+				//const int idx = (i * H_MDS + j) * H_VS_SIZE + k;
+				const int idx = GetSVarPreIdxHost(i, j, k);
 				h_SVar[idx].x = i;
 				h_SVar[idx].y = j;
 				h_SVar[idx].z = k;
 
 				h_SVarPre[idx] = 0;
-
 			}
 		}
 	}
 
-	cudaMemcpy(d_SConPre, h_SConPre,
-		H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int),
-		cudaMemcpyHostToDevice);
-	cudaMemcpy(d_SConEvt, h_SConEvt,
-		H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3),
-		cudaMemcpyHostToDevice);
-	cudaMemcpy(d_SCon, h_SCon, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3),
-		cudaMemcpyHostToDevice);
-	cudaMemcpy(d_SVar, h_SVar, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3),
-		cudaMemcpyHostToDevice);
-	cudaMemcpy(d_SVarPre, h_SVarPre,
-		H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int),
-		cudaMemcpyHostToDevice);
+	cudaMemcpy(d_SConPre, h_SConPre, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_SConEvt, h_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_SCon, h_SCon, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_SVar, h_SVar, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_SVarPre, h_SVarPre, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int), cudaMemcpyHostToDevice);
 	cudaDeviceSynchronize();
 	//获得主问题压缩的BLOCK数
 	//	H_MCCBLOCK = GetTopNum(CS_SIZE, num_threads);
@@ -940,27 +946,27 @@ __global__ void GenSubConPre(int* SVarPre, int* SCCBCount, int3* scp, int len) {
 //}
 
 // 一维
-__global__ void CompactSubQ(int* SVarPre, int3* ConEvt, int* BOffset, int3* scp, int len) {
+__global__ void CompactSubQ(int* SVarPre, int3* SConEvt, int3* SCon, int* BOffset, int3* scp, int len) {
 	//获取子问题，及
 	const int bid = blockIdx.x;
 	const int val = bid % D_MDS;
 	const int var = bid / D_MDS;
 	const int sub_con = threadIdx.x;
 	const int idx = threadIdx.x + blockIdx.x*blockDim.x;
+	const int g_idx = threadIdx.x + blockIdx.x*len;
 	extern __shared__ int warpTotals[];
 	int pred = 0;
-	int3 sp;
 
 	if (sub_con < len) {
-		sp = scp[sub_con];
+		int3 sp = scp[sub_con];
 		//获得判定
 		const int2 v_pre = make_int2(SVarPre[GetSVarPreIdxDevice(var, val, sp.x)],
 			SVarPre[GetSVarPreIdxDevice(var, val, sp.y)]);
 		pred = v_pre.x || v_pre.y;
 
-
-		//	printf("scp[%d, %d, %d], gidx = %d, pred = %d, blockIdx1D = %d\n", var, val,
-		//			sub_con, g_idx, pred, blockIdx1D);
+		//if (var == 0 && val < 2)
+		//	printf("scp[%d, %d, %d], idx = %d, pred = %d, bid = %d\n", var, val,
+		//		sub_con, idx, pred, bid);
 
 		//warp index
 		//线程束索引
@@ -1016,19 +1022,17 @@ __global__ void CompactSubQ(int* SVarPre, int3* ConEvt, int* BOffset, int3* scp,
 			const int evt_idx = t_u + warpTotals[w_i] + BOffset[blockIdx.x];
 			//		printf("warpTotals[%d] = %d\n", w_i,  warpTotals[0]);
 			//		printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, 0, 0, 0);
-			ConEvt[evt_idx].x = sp.x;
-			ConEvt[evt_idx].y = sp.y;
-			ConEvt[evt_idx].z = sp.z;
-			//printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, ConEvt[evt_idx].x,
-			//	ConEvt[evt_idx].y, ConEvt[evt_idx].z);
+			SConEvt[evt_idx].x = SCon[g_idx].x;
+			SConEvt[evt_idx].y = SCon[g_idx].y;
+			SConEvt[evt_idx].z = SCon[g_idx].z;
+			//printf("ConEvt[%d] = %d, %d, %d\n", evt_idx, SConEvt[evt_idx].x,
+			//	SConEvt[evt_idx].y, SConEvt[evt_idx].z);
 		}
 	}
 }
 
 
-int CompactConsQueMain(int mcc_blocks, int mvc_blocks, int work_size,
-	int work_size_large, thrust::device_vector<int> MCCBCount,
-	thrust::device_vector<int> MCCBOffset) {
+int CompactConsQueMain(int mcc_blocks, int mvc_blocks, int work_size, int work_size_large, thrust::device_vector<int> MCCBCount, thrust::device_vector<int> MCCBOffset) {
 	int* d_MCCBCount_ptr;
 	int* d_MCCBOffset_ptr;
 	d_MCCBCount_ptr = thrust::raw_pointer_cast(MCCBCount.data());
@@ -1059,30 +1063,25 @@ int CompactConsQueMain(int mcc_blocks, int mvc_blocks, int work_size,
 	return total;
 }
 
-int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size,
-	int cs_size, int con_thrds, thrust::device_vector<int> SCCBCount,
-	thrust::device_vector<int> SCCBOffset) {
+int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size, int cs_size, int con_thrds, int work_size_large, thrust::device_vector<int> SCCBCount, thrust::device_vector<int> SCCBOffset) {
 	int* d_SCCBCount_ptr;
 	int* d_SCCBOffset_ptr;
 	d_SCCBCount_ptr = thrust::raw_pointer_cast(SCCBCount.data());
 	d_SCCBOffset_ptr = thrust::raw_pointer_cast(SCCBOffset.data());
 	//以约束数量启动
 	//P1
-	GenSubConPre << <scc_blocks, con_thrds >> > (d_SVarPre, d_SCCBCount_ptr, d_scope,
-		cs_size);
+	GenSubConPre << <scc_blocks, con_thrds >> > (d_SVarPre, d_SCCBCount_ptr, d_scope, cs_size);
 	cudaDeviceSynchronize();
 
 	//P2
-	thrust::exclusive_scan(SCCBCount.begin(), SCCBCount.end(),
-		SCCBOffset.begin());
+	thrust::exclusive_scan(SCCBCount.begin(), SCCBCount.end(), SCCBOffset.begin());
 	cudaDeviceSynchronize();
 
-	int total = SCCBOffset[SCCBCount.size() - 1]
-		+ SCCBCount[SCCBCount.size() - 1];
-	std::cout << "total = " << total << std::endl;
+	int total = SCCBOffset[SCCBCount.size() - 1] + SCCBCount[SCCBCount.size() - 1];
+	//std::cout << "total = " << total << std::endl;
 
-	for (size_t i = 0; i < SCCBCount.size(); i++)
-		std::cout << i << ":" << SCCBCount[i] << std::endl;
+	//for (size_t i = 0; i < SCCBCount.size(); i++)
+	//	std::cout << i << ":" << SCCBCount[i] << std::endl;
 
 	if (total < 0)
 		return PROPFAILED;
@@ -1092,14 +1091,34 @@ int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size,
 	//CompactSubQ << <scc_blocks, con_thrds, sizeof(int) * (con_thrds / WARPSIZE) >> > (
 	//	d_SVarPre, d_SConEvt, d_SCCBOffset_ptr, d_scope, cs_size);
 
-	CompactSubQ << < H_VS_SIZE * H_MDS, con_thrds, sizeof(int) * (con_thrds / WARPSIZE) >> > (
-		d_SVarPre, d_SConEvt, d_SCCBOffset_ptr, d_scope, cs_size);
+	CompactSubQ << < H_VS_SIZE * H_MDS, con_thrds, sizeof(int) * (con_thrds / WARPSIZE) >> > (d_SVarPre, d_SConEvt, d_SCon, d_SCCBOffset_ptr, d_scope, cs_size);
 	cudaDeviceSynchronize();
 
-	//	MVarPreSetZero<<<mvc_blocks, work_size_large>>>(d_MVarPre);
-	//	cudaDeviceSynchronize();
+	//cudaMemcpy(h_SConEvt, d_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyDeviceToHost);
+	//for (size_t i = 0; i < total; i++)
+	//{
+	//	printf("h_SConEvt[%d] = (%2d, %2d, %3d)\n", i, h_SConEvt[i].x, h_SConEvt[i].y, h_SConEvt[i].z);
+	//}
+
+	SVarPreSetZero << <svc_blocks, work_size_large >> > (d_SVarPre);
+	cudaDeviceSynchronize();
+	//std::cout << "------------------------------" << std::endl;
+	//cudaMemcpy(h_SVarPre, d_SVarPre, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int), cudaMemcpyDeviceToHost);
+	//for (size_t i = 0; i < H_VS_SIZE; i++)
+	//{
+	//	for (size_t j = 0; j < H_MDS; j++)
+	//	{
+	//		for (size_t k = 0; k < H_VS_SIZE; k++)
+	//		{
+	//			const int idx = GetSVarPreIdxHost(i, j, k);
+	//			if (h_SVarPre[idx] == 1)
+	//				printf("h_SVarPre[%2d, %2d, %2d], %d = %d\n", i, j, k, idx, h_SVarPre[idx]);
+	//		}
+
+	//	}
+	//}
+	//std::cout << "------------------------------" << std::endl;
 	return total;
-	return 0;
 }
 void ConstraintsCheckMain(int c_total) {
 	CsCheckMain << <c_total, WORKSIZE >> > (d_MConEvt, d_MVarPre, d_scope, d_bitDom,
@@ -1112,8 +1131,8 @@ void ConstraintsCheckMain(int c_total) {
 }
 
 void ConstraintsCheckSub(int c_total) {
-	//CsCheckSub << <c_total, WORKSIZE >> > (d_SConEvt, d_SVarPre, d_MVarPre, d_scope, d_bitSubDom, d_bitDom, d_bitSup);
-	ShowSubConEvt << <c_total, WORKSIZE >> > (d_SConEvt);
+	CsCheckSub << <c_total, WORKSIZE >> > (d_SConEvt, d_SVarPre, d_MVarPre, d_scope, d_bitSubDom, d_bitDom, d_bitSup);
+	//ShowSubConEvt << <c_total, WORKSIZE >> > (d_SConEvt);
 	cudaDeviceSynchronize();
 }
 
@@ -1145,7 +1164,7 @@ float SACGPU() {
 		//		showVariables<<<H_MVCount, WORKSIZE>>>(d_bitDom, d_MVarPre, d_var_size,
 		//				H_VS_SIZE);
 	} while (mc_total > 0);
-	showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
+	//showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	//1.5. 失败返回
 	if (mc_total == PROPFAILED) {
 		cudaEventRecord(stop, 0);
@@ -1162,37 +1181,71 @@ float SACGPU() {
 	//2.1. 更新子问题论域
 	dim3 subblock_dim(H_MDS, H_VS_SIZE);
 	const int var_threads = GetTopNum(H_VS_SIZE, WORKSIZE)*WORKSIZE;
-	UpdateSubDom << <subblock_dim, var_threads >> > (d_bitDom, d_bitSubDom, d_SVarPre,
-		d_var_size, H_VS_SIZE);
+	UpdateSubDom << <subblock_dim, var_threads >> > (d_bitDom, d_bitSubDom, d_SVarPre, d_var_size, H_VS_SIZE);
 
 	//确定子问题运行规格 = 子问题为线程块，子问题约束为线程
 	//规格
 	const int H_SCCBLOCK = H_VS_SIZE * H_MDS;
 	thrust::device_vector<int> d_SCCBCount(H_SCCBLOCK, 0);
 	thrust::device_vector<int> d_SCCBOffset(H_SCCBLOCK, 0);
-	const int H_SVCBLOCK = H_SCCBLOCK;
+	const int H_SVCBLOCK = GetTopNum(H_VS_SIZE * H_VS_SIZE * H_MDS, WORKSIZE_LARGE);
 	const int con_threads = GetTopNum(H_CS_SIZE, WORKSIZE)*WORKSIZE;
 	//2.2. 压缩子问题队列
-	int sc_total = CompactConsQueSub(subblock_dim, H_SVCBLOCK, H_VS_SIZE,
-		H_CS_SIZE, con_threads, d_SCCBCount, d_SCCBOffset);
+	int sc_total = CompactConsQueSub(subblock_dim, H_SVCBLOCK, H_VS_SIZE, H_CS_SIZE, con_threads, WORKSIZE_LARGE, d_SCCBCount, d_SCCBOffset);
+	//std::cout << "sc_total = " << sc_total << std::endl;
 	//2.3. 子问题上约束检查
-	//ConstraintsCheckSub(sc_total);
-
-	cudaMemcpy(h_SConEvt, d_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyDeviceToHost);
-	for (size_t i = 0; i < sc_total; i++)
+	while (sc_total > 0)
 	{
-		printf("h_SConEvt[%d] = (%2d, %2d, %3d)\n", i, h_SConEvt[i].x, h_SConEvt[i].y, h_SConEvt[i].z);
+		ConstraintsCheckSub(sc_total);
+		//2.4. 主问题上流压缩取得约束队列
+		int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE, WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
+		while (mc_total > 0) {
+			////2.5. 约束检查
+			ConstraintsCheckMain(mc_total);
+			////2.6. 流压缩取得约束队列
+			mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE, WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
+			//std::cout << "mc_total = " << mc_total << std::endl;
+		}
+
+		//1.5. 失败返回
+		if (mc_total == PROPFAILED) {
+			cudaEventRecord(stop, 0);
+			cudaEventSynchronize(stop);
+
+			cudaEventElapsedTime(&elapsedTime, start, stop);
+			cudaEventDestroy(start);
+			cudaEventDestroy(stop);
+			printf("Failed\n");
+			return elapsedTime;
+		}
+
+		sc_total = CompactConsQueSub(subblock_dim, H_SVCBLOCK, H_VS_SIZE, H_CS_SIZE, con_threads, WORKSIZE_LARGE, d_SCCBCount, d_SCCBOffset);
+		//std::cout << "sc_total = " << sc_total << std::endl;
 	}
-	////	//2.4. 主问题上流压缩取得约束队列
-	////	int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE,
-	////			WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
-	////	while (mc_total > 0) {
-	////		////2.5. 约束检查
-	////		ConstraintsCheckMain(mc_total);
-	////		////2.6. 流压缩取得约束队列
-	////		mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE,
-	////				WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
-	////	}
+
+	////检查一下D_SVarPre
+	//cudaMemcpy(h_SVarPre, d_SVarPre, H_VS_SIZE * H_VS_SIZE * H_MDS * sizeof(int), cudaMemcpyDeviceToHost);
+
+	//for (size_t i = 0; i < H_VS_SIZE; i++)
+	//{
+	//	for (size_t j = 0; j < H_MDS; j++)
+	//	{
+	//		for (size_t k = 0; k < H_VS_SIZE; k++)
+	//		{
+	//			const int idx = GetSVarPreIdxHost(i, j, k);
+	//			if (h_SVarPre[idx] == 1)
+	//				printf("h_SVarPre[%2d, %2d, %2d], %d = %d\n", i, j, k, idx, h_SVarPre[idx]);
+	//		}
+
+	//	}
+	//}
+	//cudaMemcpy(h_SConEvt, d_SConEvt, H_CS_SIZE * H_VS_SIZE * H_MDS * sizeof(int3), cudaMemcpyDeviceToHost);
+	//for (size_t i = 0; i < sc_total; i++)
+	//{
+	//	printf("h_SConEvt[%d] = (%2d, %2d, %3d)\n", i, h_SConEvt[i].x, h_SConEvt[i].y, h_SConEvt[i].z);
+	//}
+		//2.4. 主问题上流压缩取得约束队列
+
 	////
 	//////1.5. 失败返回
 	////	if (mc_total == PROPFAILED) {
@@ -1205,7 +1258,7 @@ float SACGPU() {
 	////		printf("Failed\n");
 	////		return elapsedTime;
 	////	}
-
+	//showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	//更新子问题论域
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);

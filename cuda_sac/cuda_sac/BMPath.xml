@@ -3,8 +3,8 @@
   <BMFiles nbBMFiles = "1">
     <!--<BMFile id ="0">queens-4_ext.xml</BMFile>-->
     <!--<BMFile id ="0">queens-12_ext.xml</BMFile>-->
-    <BMFile id ="0">G:/Projects/benchmarks/frb30-15/frb30-15-1_ext.xml</BMFile>
-    <!--<BMFile id ="0">E:\Projects\benchmarks\driver\driverlogw-01c-sat_ext.xml</BMFile>-->
+    <!--<BMFile id ="0">G:/Projects/benchmarks/frb30-15/frb30-15-1_ext.xml</BMFile>-->
+    <BMFile id ="0">G:/Projects/benchmarks/tightness0.5/rand-2-40-25-180-500-0_ext.xml</BMFile>
     <!--<BMFile id ="0">XMLFileNeg2.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFileNeg.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFile.xml</BMFile>-->
