@@ -1160,6 +1160,7 @@ float SACGPU() {
 		//		showVariables<<<H_MVCount, WORKSIZE>>>(d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	} while (mc_total > 0);
 	//showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
+	
 	//1.5. Ê§°Ü·µ»Ø
 	if (mc_total == PROPFAILED) {
 		cudaEventRecord(stop, 0);
