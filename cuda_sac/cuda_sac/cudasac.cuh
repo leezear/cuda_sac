@@ -144,8 +144,7 @@ inline int GetSVarPreIdxHost(int x, int a, int y) {
 	return (x * H_MDS + a) * H_VS_SIZE + y;
 }
 
-static __inline__ __device__ void DelValDevice(u32* bitDom, int* mVarPre, int x,
-	int a) {
+static __inline__ __device__ void DelValDevice(u32* bitDom, int* mVarPre, int x, int a) {
 	u32 les = bitDom[x] & D_U32_MASK0[a];
 	if (bitDom[x] != les) {
 		atomicAnd(&bitDom[x], D_U32_MASK0[a]);
@@ -477,7 +476,7 @@ __global__ void CsCheckSub(int3* sConEvt, int* sVarPre, int* mVarPre, int3* scop
 
 			if (bitSubDom[s_bitSubDomIdx.x] == 0) {
 				sVarPre[s_sVarPreIdx.x] = INT_MIN;
-				printf("bid = %d, (%d, %d), c_id = %d should be delete!\n", bid, s_cevt.x, s_cevt.y, s_cevt.z);
+				//printf("bid = %d, (%d, %d), c_id = %d should be delete!\n", bid, s_cevt.x, s_cevt.y, s_cevt.z);
 				DelValDevice(bitDom, mVarPre, s_cevt.x, s_cevt.y);
 			}
 		}
@@ -492,7 +491,7 @@ __global__ void CsCheckSub(int3* sConEvt, int* sVarPre, int* mVarPre, int3* scop
 
 			if (bitSubDom[s_bitSubDomIdx.y] == 0) {
 				sVarPre[s_sVarPreIdx.y] = INT_MIN;
-				printf("(%d, %d), c_id = %d should be delete!\n", s_cevt.x, s_cevt.y, s_cevt.z);
+				//printf("(%d, %d), c_id = %d should be delete!\n", s_cevt.x, s_cevt.y, s_cevt.z);
 				DelValDevice(bitDom, mVarPre, s_cevt.x, s_cevt.y);
 			}
 		}
@@ -1121,8 +1120,7 @@ int CompactConsQueSub(dim3 scc_blocks, int svc_blocks, const int vs_size, int cs
 	return total;
 }
 void ConstraintsCheckMain(int c_total) {
-	CsCheckMain << <c_total, WORKSIZE >> > (d_MConEvt, d_MVarPre, d_scope, d_bitDom,
-		d_bitSup);
+	CsCheckMain << <c_total, WORKSIZE >> > (d_MConEvt, d_MVarPre, d_scope, d_bitDom, d_bitSup);
 	//	CsCheckMainLocal<<<c_total, WORKSIZE>>>(d_MConEvt, d_MVarPre, d_scope,
 	//			d_bitDom, d_bitSup);
 	//	CsCheckMain<<<1, WORKSIZE, (sizeof(int3) + sizeof(uint2))>>>(d_MConEvt,
@@ -1151,18 +1149,15 @@ float SACGPU() {
 	const int H_MVCBLOCK = GetTopNum(H_VS_SIZE, WORKSIZE_LARGE);
 
 	//1.2. 流压缩取得约束队列
-	int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE,
-		WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
-	//	printf("----------------------------------\n");
+	int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE, WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
+	//std::cout << "mc_total = " << mc_total << std::endl;
 	do {
 		////1.3. 约束检查
 		ConstraintsCheckMain(mc_total);
 		////1.4. 流压缩取得约束队列
-		mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE,
-			WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
-		//		printf("----------------------------------\n");
-		//		showVariables<<<H_MVCount, WORKSIZE>>>(d_bitDom, d_MVarPre, d_var_size,
-		//				H_VS_SIZE);
+		mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE, WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
+		//std::cout << "mc_total = " << mc_total << std::endl;
+		//		showVariables<<<H_MVCount, WORKSIZE>>>(d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	} while (mc_total > 0);
 	//showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	//1.5. 失败返回
@@ -1199,6 +1194,7 @@ float SACGPU() {
 		ConstraintsCheckSub(sc_total);
 		//2.4. 主问题上流压缩取得约束队列
 		int mc_total = CompactConsQueMain(H_MCCBLOCK, H_MVCBLOCK, WORKSIZE, WORKSIZE_LARGE, d_MCCBCount, d_MCCBOffset);
+		//std::cout << "mc_total = " << mc_total << std::endl;
 		while (mc_total > 0) {
 			////2.5. 约束检查
 			ConstraintsCheckMain(mc_total);

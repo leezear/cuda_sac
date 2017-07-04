@@ -4,7 +4,9 @@
     <!--<BMFile id ="0">queens-4_ext.xml</BMFile>-->
     <!--<BMFile id ="0">queens-12_ext.xml</BMFile>-->
     <!--<BMFile id ="0">G:/Projects/benchmarks/frb30-15/frb30-15-1_ext.xml</BMFile>-->
-    <BMFile id ="0">G:/Projects/benchmarks/tightness0.5/rand-2-40-25-180-500-0_ext.xml</BMFile>
+    <!--<BMFile id ="0">E:/Projects/benchmarks/tightness0.1/rand-2-40-8-753-100-0_ext.xml</BMFile>-->
+    <BMFile id ="0">E:/Projects/benchmarks/composed-25-1-40/composed-25-1-40-0_ext.xml</BMFile>
+    <!--<BMFile id ="0">E:/Projects/benchmarks/tightness0.5/rand-2-40-25-180-500-0_ext.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFileNeg2.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFileNeg.xml</BMFile>-->
     <!--<BMFile id ="0">XMLFile.xml</BMFile>-->
