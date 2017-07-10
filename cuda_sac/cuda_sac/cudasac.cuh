@@ -692,14 +692,11 @@ float BuidBitModel32bit(XModel *xm) {
 	//	}
 	//}
 
-	cudaMemcpy(d_bitSubDom, h_bitSubDom,
-		H_VS_SIZE * H_MDS * H_VS_SIZE * sizeof(u32),
-		cudaMemcpyHostToDevice);
+	cudaMemcpy(d_bitSubDom, h_bitSubDom, H_VS_SIZE * H_MDS * H_VS_SIZE * sizeof(u32), cudaMemcpyHostToDevice);
 	// dim.x dim.y dim.z
 	dim3 SubProDim(H_MDS, H_VS_SIZE);
 	int topnum_var_threads = GetTopNum(H_VS_SIZE, WORKSIZE) * WORKSIZE;
-	showSubVar << <SubProDim, topnum_var_threads >> > (d_bitSubDom, d_var_size,
-		H_VS_SIZE);
+	showSubVar << <SubProDim, topnum_var_threads >> > (d_bitSubDom, d_var_size, H_VS_SIZE);
 	cudaDeviceSynchronize();
 	//´´½¨bitSup
 	h_bitSup = (uint2*)malloc(H_CS_SIZE * H_MDS * sizeof(uint2));
@@ -1160,7 +1157,7 @@ float SACGPU() {
 		//		showVariables<<<H_MVCount, WORKSIZE>>>(d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
 	} while (mc_total > 0);
 	//showVariables << <H_MVCount, WORKSIZE >> > (d_bitDom, d_MVarPre, d_var_size, H_VS_SIZE);
-	
+
 	//1.5. Ê§°Ü·µ»Ø
 	if (mc_total == PROPFAILED) {
 		cudaEventRecord(stop, 0);
