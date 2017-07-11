@@ -1,27 +1,22 @@
 #include "XModel.h"
 #include <string>
 
-namespace cudacp
-{
+namespace cudacp {
 
 XDom::XDom(int id_, int size_, char* val_str_) :
-	id(id_), size(size_)
-{
+	id(id_), size(size_) {
 	values = new int[size];
 	GenerateValues(val_str_);
 }
 
-XDom::~XDom()
-{
-	for (int i = 0; i < size; ++i)
-	{
+XDom::~XDom() {
+	for (int i = 0; i < size; ++i) {
 		delete[] values;
 		values = NULL;
 	}
 }
 
-void XDom::GenerateValues(char* values_str)
-{
+void XDom::GenerateValues(char* values_str) {
 	std::string s = values_str;
 	s += " ";
 	std::string tmp = values_str;
@@ -65,8 +60,7 @@ void XDom::GenerateValues(char* values_str)
 }
 
 XRel::XRel(const int id_, const int arity_, const int size_, const Semantices sem_, char* tuples_str_)
-	:id(id_), arity(arity_), size(size_), sem(sem_)
-{
+	:id(id_), arity(arity_), size(size_), sem(sem_) {
 	tuples = new int *[size];
 
 	for (int i = 0; i < size; ++i)
@@ -75,10 +69,8 @@ XRel::XRel(const int id_, const int arity_, const int size_, const Semantices se
 	GenerateTuples(tuples_str_);
 }
 
-XRel::~XRel()
-{
-	for (int i = 0; i < size; ++i)
-	{
+XRel::~XRel() {
+	for (int i = 0; i < size; ++i) {
 		delete[] tuples[i];
 		tuples[i] = NULL;
 	}
@@ -87,32 +79,27 @@ XRel::~XRel()
 	tuples = NULL;
 }
 
-void XRel::GenerateTuples(char *tuples_str_)
-{
+void XRel::GenerateTuples(char *tuples_str_) {
 	for (int i = 0; i < size; ++i)
 		for (int j = 0; j < arity; ++j)
 			tuples[i][j] = atoi(strtok_s(tuples_str_, " |", &tuples_str_));
 }
 
 XCon::XCon(const int id_, const int rel_id_, const int arity_, char * scope_str_)
-	:id(id_), rel_id(rel_id_), arity(arity_)
-{
+	:id(id_), rel_id(rel_id_), arity(arity_) {
 	scope = new int[arity];
 
 	for (int i = 0; i < arity; ++i)
 		scope[i] = atoi(strtok_s(scope_str_, " V", &scope_str_));
 }
 
-XCon::~XCon()
-{
+XCon::~XCon() {
 	delete[] scope;
 	scope = NULL;
 }
 
-XModel::~XModel()
-{
-	for (int i = 0; i < feature.ds_size; ++i)
-	{
+XModel::~XModel() {
+	for (int i = 0; i < feature.ds_size; ++i) {
 		delete  doms[i];
 		doms[i] = NULL;
 	}
@@ -120,24 +107,21 @@ XModel::~XModel()
 	doms = NULL;
 
 
-	for (int i = 0; i < feature.vs_size; ++i)
-	{
+	for (int i = 0; i < feature.vs_size; ++i) {
 		delete  vars[i];
 		vars[i] = NULL;
 	}
 	delete[]  vars;
 	vars = NULL;
 
-	for (int i = 0; i < feature.rs_size; ++i)
-	{
+	for (int i = 0; i < feature.rs_size; ++i) {
 		delete  rels[i];
 		rels[i] = NULL;
 	}
 	delete[]  rels;
 	rels = NULL;
 
-	for (int i = 0; i < feature.cs_size; ++i)
-	{
+	for (int i = 0; i < feature.cs_size; ++i) {
 		delete  cons[i];
 		cons[i] = NULL;
 	}

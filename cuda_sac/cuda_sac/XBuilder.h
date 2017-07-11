@@ -11,19 +11,18 @@
 #include <iostream>
 #include <string>
 #include <stdio.h>
+#include <map>
 #include "XModel.h"
 
 using namespace xercesc_3_1;
 typedef xercesc_3_1::DOMDocument DOMDOC;
 
-namespace cudacp
-{
+namespace cudacp {
 
 /**
 *\brief some Types of bankmark file type
 */
-enum BMFileType
-{
+enum BMFileType {
 	BFT_TXT,			///<txt doc
 	BFT_XCSP_2_0_INT,	///<xcsp v2.0 intension
 	BFT_XCSP_2_1_INT,	///<xcsp v2.1 intension
@@ -33,14 +32,28 @@ enum BMFileType
 	BFT_XCSP_3_0_EXT	///<xcsp v3.0 extension
 };
 
-enum XmlReaderType
-{
+enum XmlReaderType {
 	XRT_BM_PATH,		///<banchmark path file
 	XRT_BM				///<banchmark
 };
 
-class XBuilder
-{
+class DomMap {
+public:
+	int id;
+	std::map<int, int> m;
+
+	DomMap() {};
+	~DomMap() {};
+	void MakeMap(XDom* d) {
+		id = d->id;
+		for (int i = 0; i < d->size; i++)
+			m[d->values[i]] = i;
+	}
+};
+
+class TableMap {};
+
+class XBuilder {
 public:
 
 	/**
