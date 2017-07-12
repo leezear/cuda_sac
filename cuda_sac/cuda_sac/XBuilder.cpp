@@ -1,15 +1,11 @@
 #include "XBuilder.h"
 
-namespace cudacp
-{
+namespace cudacp {
 
 XBuilder::XBuilder(std::string file_name, XmlReaderType type)
-	: file_name_(file_name), type_(type)
-{
-	if (initial())
-	{
-		switch (type_)
-		{
+	: file_name_(file_name), type_(type) {
+	if (initial()) {
+		switch (type_) {
 		case XRT_BM_PATH:
 			break;
 		case XRT_BM:
@@ -20,8 +16,7 @@ XBuilder::XBuilder(std::string file_name, XmlReaderType type)
 	}
 }
 
-void XBuilder::GenerateModelFromXml(XModel * i_model)
-{
+void XBuilder::GenerateModelFromXml(XModel * i_model) {
 	model_ = i_model;
 	getFeature();
 	generateDomains();
@@ -30,8 +25,7 @@ void XBuilder::GenerateModelFromXml(XModel * i_model)
 	generateConstraints();
 }
 
-std::string XBuilder::GetBMFile() const
-{
+std::string XBuilder::GetBMFile() const {
 	std::string bm_file = "";
 
 	if (true) {
@@ -45,18 +39,15 @@ std::string XBuilder::GetBMFile() const
 	return bm_file;
 }
 
-XBuilder::~XBuilder()
-{
-	if (root_)
-	{
+XBuilder::~XBuilder() {
+	if (root_) {
 		delete (parser_);
 		parser_ = NULL;
 		XMLPlatformUtils::Terminate();
 	}
 }
 
-void XBuilder::getFeature()
-{
+void XBuilder::getFeature() {
 	model_->feature.max_arity = getMaxArity();
 	model_->feature.ds_size = getDomsNum();
 	model_->feature.vs_size = getVarsNum();
@@ -65,7 +56,7 @@ void XBuilder::getFeature()
 }
 
 bool XBuilder::initial() {
-	if (this->file_name_ == "") 
+	if (this->file_name_ == "")
 		return false;
 
 	try {
@@ -94,71 +85,64 @@ bool XBuilder::initial() {
 }
 
 
-int XBuilder::getDomsNum()
-{
+int XBuilder::getDomsNum() {
 	DOMNode *doms_nodes = root_->getElementsByTagName(XMLString::transcode("domains"))->item(0);
 	int num_doms = XMLString::parseInt(doms_nodes->getAttributes()->getNamedItem(XMLString::transcode("nbDomains"))->getTextContent());
 	return num_doms;
 }
 
-int XBuilder::getVarsNum()
-{
+int XBuilder::getVarsNum() {
 	DOMNode *vars_node = root_->getElementsByTagName(XMLString::transcode("variables"))->item(0);
 	int num_vars = XMLString::parseInt(vars_node->getAttributes()->getNamedItem(XMLString::transcode("nbVariables"))->getTextContent());
 	return num_vars;
 }
 
-int XBuilder::getRelsNum()
-{
+int XBuilder::getRelsNum() {
 	DOMNode* relations_node = root_->getElementsByTagName(XMLString::transcode("relations"))->item(0);
 	int num_rels = XMLString::parseInt(relations_node->getAttributes()->getNamedItem(XMLString::transcode("nbRelations"))->getTextContent());
 	return num_rels;
 }
 
-int XBuilder::getConsNum()
-{
+int XBuilder::getConsNum() {
 	DOMNode* cons_node = root_->getElementsByTagName(XMLString::transcode("constraints"))->item(0);
 	int num_cons = XMLString::parseInt(cons_node->getAttributes()->getNamedItem(XMLString::transcode("nbConstraints"))->getTextContent());
 	return num_cons;
 }
 
-int XBuilder::getMaxArity()
-{
+int XBuilder::getMaxArity() {
 	DOMNode *node = root_->getElementsByTagName(XMLString::transcode("presentation"))->item(0);
 	int max_arity = XMLString::parseInt(node->getAttributes()->getNamedItem(XMLString::transcode("maxConstraintArity"))->getTextContent());
 	return max_arity;
 }
 
-void XBuilder::generateDomains()
-{
+void XBuilder::generateDomains() {
 	int max_d_s = 0, size;
 	DOMNodeList *nodes = root_->getElementsByTagName(XMLString::transcode("domain"));
 	char * values;
 	DOMNode * node;
 	model_->doms = new XDom*[model_->feature.ds_size];
+	std::vector<DomMap> xds(model_->feature.ds_size);
 
-	for (int i = 0; i < model_->feature.ds_size; ++i)
-	{
+	for (int i = 0; i < model_->feature.ds_size; ++i) {
 		node = nodes->item(i);
 		size = XMLString::parseInt(node->getAttributes()->getNamedItem(XMLString::transcode("nbValues"))->getTextContent());
 		max_d_s = MAX(max_d_s, size);
 		values = XMLString::transcode(node->getFirstChild()->getNodeValue());
 		model_->doms[i] = new XDom(i, size, values);
+		xds[i].MakeMap(model_->doms[i]);
 	}
 
 	model_->feature.max_dom_size = max_d_s;
 }
 
-void XBuilder::generateVariables()
-{
+void XBuilder::generateVariables() {
 	DOMNode* var_node;
 	DOMNodeList* var_nodes = root_->getElementsByTagName(XMLString::transcode("variable"));
 	int dom_id;
 	char* dom_id_str;
 	model_->vars = new XVar*[model_->feature.vs_size];
 
-	for (int i = 0; i < model_->feature.vs_size; ++i)
-	{
+	for (int i = 0; i < model_->feature.vs_size; ++i) {
 		var_node = var_nodes->item(i);
 		dom_id_str = XMLString::transcode(var_node->getAttributes()->getNamedItem(XMLString::transcode("domain"))->getTextContent());
 		sscanf_s(dom_id_str, "D%d", &dom_id);
@@ -167,8 +151,7 @@ void XBuilder::generateVariables()
 	}
 }
 
-void XBuilder::generateRelations()
-{
+void XBuilder::generateRelations() {
 	DOMNode *node;
 	DOMNodeList* nodes = root_->getElementsByTagName(XMLString::transcode("relation"));
 	int arity;
@@ -176,8 +159,7 @@ void XBuilder::generateRelations()
 	Semantices sem;
 	model_->rels = new XRel*[model_->feature.rs_size];
 
-	for (int i = 0; i < model_->feature.rs_size; ++i)
-	{
+	for (int i = 0; i < model_->feature.rs_size; ++i) {
 		node = nodes->item(i);
 		arity = XMLString::parseInt(node->getAttributes()->getNamedItem(XMLString::transcode("arity"))->getTextContent());
 		char* semantics = XMLString::transcode(node->getAttributes()->getNamedItem(XMLString::transcode("semantics"))->getTextContent());
@@ -191,15 +173,13 @@ void XBuilder::generateRelations()
 	}
 }
 
-void XBuilder::generateConstraints()
-{
+void XBuilder::generateConstraints() {
 	int rel_id;
 	DOMNode* node;
 	DOMNodeList* nodes = root_->getElementsByTagName(XMLString::transcode("constraint"));
 	model_->cons = new XCon*[model_->feature.cs_size];
 
-	for (int i = 0; i < model_->feature.cs_size; ++i)
-	{
+	for (int i = 0; i < model_->feature.cs_size; ++i) {
 		node = nodes->item(i);
 		int arity = XMLString::parseInt(node->getAttributes()->getNamedItem(XMLString::transcode("arity"))->getTextContent());
 		char *scope_str = XMLString::transcode(node->getAttributes()->getNamedItem(XMLString::transcode("scope"))->getTextContent());
