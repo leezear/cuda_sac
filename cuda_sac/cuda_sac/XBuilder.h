@@ -42,17 +42,25 @@ class DomMap {
 public:
 	int id;
 	std::map<int, int> m;
+	DomType dt = standard;
 
 	DomMap() {};
 	~DomMap() {};
 	void MakeMap(XDom* d) {
 		id = d->id;
-		for (int i = 0; i < d->size; i++)
+		for (int i = 0; i < d->size; i++) {
 			m[d->values[i]] = i;
+			if (d->values[i] != i) {
+				dt = disperse;
+			}
+		}
 	}
 };
 
-class TableMap {};
+enum DomType {
+	standard,
+	disperse
+};
 
 class XBuilder {
 public:
@@ -87,6 +95,7 @@ private:
 	XercesDOMParser *parser_;
 	DOMElement *root_;
 	DOMDOC *document_;
+	std::vector<DomMap> xds;
 
 	bool initial();
 	void getFeature();
@@ -100,6 +109,7 @@ private:
 	void generateVariables();
 	void generateRelations();
 	void generateConstraints();
+	void modifyTuple();
 };
 }
 

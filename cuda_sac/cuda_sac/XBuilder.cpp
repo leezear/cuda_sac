@@ -121,7 +121,7 @@ void XBuilder::generateDomains() {
 	char * values;
 	DOMNode * node;
 	model_->doms = new XDom*[model_->feature.ds_size];
-	std::vector<DomMap> xds(model_->feature.ds_size);
+	xds.resize(model_->feature.ds_size);
 
 	for (int i = 0; i < model_->feature.ds_size; ++i) {
 		node = nodes->item(i);
@@ -188,6 +188,18 @@ void XBuilder::generateConstraints() {
 		model_->cons[i] = new XCon(i, rel_id, arity, scope_str);
 		XMLString::release(&scope_str);
 		XMLString::release(&rel_id_str);
+	}
+}
+
+void XBuilder::modifyTuple() {
+
+	for (int i = 0; i < model_->feature.cs_size; ++i) {
+		XCon* c = model_->cons[i];
+		for (int j = 0; j < c->arity; ++j) {
+			if (xds[model_->vars[c->scope[j]]->dom_id].dt == disperse) {
+
+			}
+		}
 	}
 }
 
