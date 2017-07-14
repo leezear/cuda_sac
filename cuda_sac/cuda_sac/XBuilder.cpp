@@ -195,9 +195,13 @@ void XBuilder::modifyTuple() {
 
 	for (int i = 0; i < model_->feature.cs_size; ++i) {
 		XCon* c = model_->cons[i];
+		XRel* r = model_->rels[c->rel_id];
 		for (int j = 0; j < c->arity; ++j) {
+			XVar* v = model_->vars[c->scope[j]];
 			if (xds[model_->vars[c->scope[j]]->dom_id].dt == disperse) {
-
+				for (int k = 0; k < r->size; ++k) {
+					r->tuples[k][j] = xds[v->dom_id].m[r->tuples[k][j]];
+				}
 			}
 		}
 	}
