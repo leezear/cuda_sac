@@ -189,6 +189,8 @@ void XBuilder::generateConstraints() {
 		XMLString::release(&scope_str);
 		XMLString::release(&rel_id_str);
 	}
+
+	modifyTuple();
 }
 
 void XBuilder::modifyTuple() {
@@ -200,10 +202,26 @@ void XBuilder::modifyTuple() {
 			XVar* v = model_->vars[c->scope[j]];
 			if (xds[model_->vars[c->scope[j]]->dom_id].dt == disperse) {
 				for (int k = 0; k < r->size; ++k) {
-					r->tuples[k][j] = xds[v->dom_id].m[r->tuples[k][j]];
+					const int s = r->tuples[k][j];
+					const int res = xds[v->dom_id].m[s];
+					r->tuples[k][j] = res;
 				}
 			}
 		}
+	}
+
+	for (int i = 0; i < model_->feature.cs_size; ++i) {
+
+		printf("%d : ", i);
+		XCon* c = model_->cons[i];
+		XRel* r = model_->rels[c->rel_id];
+		for (int j = 0; j < r->size; ++j) {
+			for (int k = 0; k < c->arity; ++k) {
+				printf("%2d ", r->tuples[j][k]);
+			}
+			printf("|");
+		}
+		printf("\n");
 	}
 }
 

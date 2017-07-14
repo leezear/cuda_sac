@@ -38,6 +38,11 @@ enum XmlReaderType {
 	XRT_BM				///<banchmark
 };
 
+enum DomType {
+	standard,
+	disperse
+};
+
 class DomMap {
 public:
 	int id;
@@ -57,10 +62,6 @@ public:
 	}
 };
 
-enum DomType {
-	standard,
-	disperse
-};
 
 class XBuilder {
 public:
