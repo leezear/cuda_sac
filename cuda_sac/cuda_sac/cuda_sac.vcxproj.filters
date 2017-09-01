@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="cudasac.cu">
+      <Filter>CudaModel</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XBuilder.cpp">
+      <Filter>XModel</Filter>
+    </ClCompile>
+    <ClCompile Include="XModel.cpp">
+      <Filter>XModel</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cudasac.cuh">
+      <Filter>CudaModel</Filter>
+    </ClInclude>
+    <ClInclude Include="XBuilder.h">
+      <Filter>XModel</Filter>
+    </ClInclude>
+    <ClInclude Include="XModel.h">
+      <Filter>XModel</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="BMPath.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+    <Xml Include="XMLFile.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+    <Xml Include="XMLFileNeg.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+    <Xml Include="XMLFileNeg2.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+    <Xml Include="queens-4_ext.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+    <Xml Include="queens-12_ext.xml">
+      <Filter>Resources</Filter>
+    </Xml>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{65c4dd47-88b3-4635-a10c-32eca36b01de}</UniqueIdentifier>
+      <Extensions>.xml</Extensions>
+    </Filter>
+    <Filter Include="CudaModel">
+      <UniqueIdentifier>{586dfd48-4c50-424f-8d98-e804f46aa2f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="XModel">
+      <UniqueIdentifier>{1d2e7013-7c72-4ee5-bd14-e9af0e700d9f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Text.txt">
+      <Filter>Resources</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

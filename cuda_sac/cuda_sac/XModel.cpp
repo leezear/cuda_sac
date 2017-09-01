@@ -1,5 +1,4 @@
 #include "XModel.h"
-#include <string>
 
 namespace cudacp {
 

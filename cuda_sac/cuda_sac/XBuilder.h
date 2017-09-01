@@ -11,14 +11,14 @@
 #include <iostream>
 #include <string>
 #include <stdio.h>
-#include <map>
 #include <vector>
 #include "XModel.h"
 
 using namespace xercesc_3_1;
 typedef xercesc_3_1::DOMDocument DOMDOC;
 
-namespace cudacp {
+namespace cudacp
+{
 
 /**
 *\brief some Types of bankmark file type
@@ -43,24 +43,24 @@ enum DomType {
 	disperse
 };
 
-class DomMap {
-public:
-	int id;
-	std::map<int, int> m;
-	DomType dt = standard;
-
-	DomMap() {};
-	~DomMap() {};
-	void MakeMap(XDom* d) {
-		id = d->id;
-		for (int i = 0; i < d->size; i++) {
-			m[d->values[i]] = i;
-			if (d->values[i] != i) {
-				dt = disperse;
-			}
-		}
-	}
-};
+//class DomMap {
+//public:
+//	int id;
+//	std::map<int, int> m;
+//	DomType dt = standard;
+//
+//	DomMap() {};
+//	~DomMap() {};
+//	void MakeMap(XDom* d) {
+//		id = d->id;
+//		for (int i = 0; i < d->size; i++) {
+//			m[d->values[i]] = i;
+//			if (d->values[i] != i) {
+//				dt = disperse;
+//			}
+//		}
+//	}
+//};
 
 
 class XBuilder {
@@ -96,7 +96,7 @@ private:
 	XercesDOMParser *parser_;
 	DOMElement *root_;
 	DOMDOC *document_;
-	std::vector<DomMap> xds;
+	//std::vector<DomMap> xds;
 
 	bool initial();
 	void getFeature();

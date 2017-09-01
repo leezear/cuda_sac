@@ -121,7 +121,7 @@ void XBuilder::generateDomains() {
 	char * values;
 	DOMNode * node;
 	model_->doms = new XDom*[model_->feature.ds_size];
-	xds.resize(model_->feature.ds_size);
+	//xds.resize(model_->feature.ds_size);
 
 	for (int i = 0; i < model_->feature.ds_size; ++i) {
 		node = nodes->item(i);
@@ -129,7 +129,7 @@ void XBuilder::generateDomains() {
 		max_d_s = MAX(max_d_s, size);
 		values = XMLString::transcode(node->getFirstChild()->getNodeValue());
 		model_->doms[i] = new XDom(i, size, values);
-		xds[i].MakeMap(model_->doms[i]);
+		//xds[i].MakeMap(model_->doms[i]);
 	}
 
 	model_->feature.max_dom_size = max_d_s;
@@ -190,39 +190,39 @@ void XBuilder::generateConstraints() {
 		XMLString::release(&rel_id_str);
 	}
 
-	modifyTuple();
+	//modifyTuple();
 }
 
-void XBuilder::modifyTuple() {
-
-	for (int i = 0; i < model_->feature.cs_size; ++i) {
-		XCon* c = model_->cons[i];
-		XRel* r = model_->rels[c->rel_id];
-		for (int j = 0; j < c->arity; ++j) {
-			XVar* v = model_->vars[c->scope[j]];
-			if (xds[model_->vars[c->scope[j]]->dom_id].dt == disperse) {
-				for (int k = 0; k < r->size; ++k) {
-					const int s = r->tuples[k][j];
-					const int res = xds[v->dom_id].m[s];
-					r->tuples[k][j] = res;
-				}
-			}
-		}
-	}
-
-	for (int i = 0; i < model_->feature.cs_size; ++i) {
-
-		printf("%d : ", i);
-		XCon* c = model_->cons[i];
-		XRel* r = model_->rels[c->rel_id];
-		for (int j = 0; j < r->size; ++j) {
-			for (int k = 0; k < c->arity; ++k) {
-				printf("%2d ", r->tuples[j][k]);
-			}
-			printf("|");
-		}
-		printf("\n");
-	}
-}
+//void XBuilder::modifyTuple() {
+//
+//	for (int i = 0; i < model_->feature.cs_size; ++i) {
+//		XCon* c = model_->cons[i];
+//		XRel* r = model_->rels[c->rel_id];
+//		for (int j = 0; j < c->arity; ++j) {
+//			XVar* v = model_->vars[c->scope[j]];
+//			if (xds[model_->vars[c->scope[j]]->dom_id].dt == disperse) {
+//				for (int k = 0; k < r->size; ++k) {
+//					const int s = r->tuples[k][j];
+//					const int res = xds[v->dom_id].m[s];
+//					r->tuples[k][j] = res;
+//				}
+//			}
+//		}
+//	}
+//
+//	for (int i = 0; i < model_->feature.cs_size; ++i) {
+//
+//		printf("%d : ", i);
+//		XCon* c = model_->cons[i];
+//		XRel* r = model_->rels[c->rel_id];
+//		for (int j = 0; j < r->size; ++j) {
+//			for (int k = 0; k < c->arity; ++k) {
+//				printf("%2d ", r->tuples[j][k]);
+//			}
+//			printf("|");
+//		}
+//		printf("\n");
+//	}
+//}
 
 }

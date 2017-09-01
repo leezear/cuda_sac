@@ -19,14 +19,14 @@ int main()
 	XBuilder builder(bm_path, XRT_BM);
 	XModel* xmodel = new XModel();
 	builder.GenerateModelFromXml(xmodel);
-	//float build_time = BuidBitModel32bit(xmodel);
-	//float exe_time = SACGPU();
-	//DelGPUModel();
+	float build_time = BuidBitModel32bit(xmodel);
+	float exe_time = SACGPU();
+	DelGPUModel();
 
 	delete xmodel;
 	xmodel = NULL;
-	//printf("Build time = %f\n", build_time);
-	//printf("Execution time = %f\n", exe_time);
+	printf("Build time = %f\n", build_time);
+	printf("Execution time = %f\n", exe_time);
 	printf("---end---\n");
 	return 0;
 }
